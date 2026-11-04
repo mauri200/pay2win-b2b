@@ -1,0 +1,17 @@
+﻿# Secretos (nunca subir)
+.env
+
+# Entorno virtual
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# QR generado (lleva un token firmado)
+pay2win_qr.png
+
+# Editor y sistema
+.vscode/
+.DS_Store

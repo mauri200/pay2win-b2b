@@ -1,0 +1,9 @@
+paypal-agent-toolkit
+langchain
+langchain-groq
+langgraph>=0.2.60
+python-dotenv
+pyjwt
+qrcode[pil]
+fastapi
+uvicorn
