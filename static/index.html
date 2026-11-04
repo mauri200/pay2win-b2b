@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pay2Win paycon</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-grid.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-theme-quartz.css">
+<script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.js"></script>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--tx:#14213d;--mut:#5b6478;--ac:#0b4fc4;--bd:#dde1ea}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1420;--card:#171e2e;--tx:#e8ecf5;--mut:#9aa4ba;--ac:#6ea0ff;--bd:#2a3550}}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--tx);padding:20px}
+h1{margin:0 0 4px}p.s{color:var(--mut);margin:0 0 18px}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px}
+label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+input,select{width:100%;padding:8px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx)}
+button{margin-top:12px;padding:9px 14px;border:0;border-radius:8px;background:var(--ac);color:#fff;cursor:pointer;font-weight:600}
+button.o{background:transparent;color:var(--ac);border:1px solid var(--ac)}
+img{max-width:200px;display:block;margin:10px auto}
+#st{white-space:pre-wrap;font-size:14px}#grid{height:300px;margin-top:16px}
+</style></head><body>
+<h1>Pay2Win paycon</h1>
+<p class="s">Un QR firmado con tope de gasto. El agente cotiza y crea la orden; tú apruebas en PayPal (Pay in 4).</p>
+<div class="g">
+ <div class="c"><b>1. Generar QR</b>
+  <label>Producto</label><select id="q"><option>Laptop Dell i7</option><option>Smartphone Pixel</option><option>Audífonos Noise Cancelling</option><option>Monitor 4K 27 pulgadas</option><option>TV OLED 65 pulgadas</option></select>
+  <label>Tope de gasto (USD)</label><input id="m" type="number" value="600">
+  <label>Financiamiento</label><select id="f"><option value="pay_in_4">Pay in 4</option><option value="none">Pago completo</option></select>
+  <button onclick="genQR()">Generar QR</button><img id="qr" alt="">
+ </div>
+ <div class="c"><b>2. Escanear y aprobar</b>
+  <div><button onclick="scan()">Escanear QR</button></div>
+  <p id="st">Genera un QR para empezar.</p>
+  <a id="lnk" target="_blank" style="display:none"><button class="o">Abrir en PayPal</button></a>
+  <button id="ok" style="display:none" onclick="resume(true)">Ya aprobé: cobrar</button>
+ </div>
+</div>
+<div class="c" style="margin-top:16px"><b>Historial de órdenes</b><div id="grid" class="ag-theme-quartz"></div></div>
+<script>
+let token=null,tid=null;
+const $=id=>document.getElementById(id);
+const grid=agGrid.createGrid($('grid'),{
+ columnDefs:[{field:'creado',headerName:'Hora',width:100},{field:'producto',headerName:'Producto',flex:1},
+  {field:'monto',headerName:'USD',width:100},{field:'financiamiento',headerName:'Financ.',width:110},
+  {field:'estado',headerName:'Estado',width:190},{field:'mensaje',headerName:'Detalle',flex:2}],
+ rowData:[]});
+async function refresh(){grid.setGridOption('rowData',await (await fetch('/api/orders')).json())}
+async function genQR(){
+ const p=new URLSearchParams({query:$('q').value,max_amount:$('m').value,financing:$('f').value});
+ const r=await (await fetch('/api/qr?'+p)).json();token=r.token;$('qr').src=r.png;$('st').textContent='QR listo. Pulsa "Escanear QR".';}
+function show(o){
+ tid=o.thread_id;const w=o.estado==='esperando_aprobacion';
+ $('st').textContent=`Estado: ${o.estado}\n${o.producto?o.producto+' - $'+o.monto:''}\n${o.mensaje||''}`;
+ $('lnk').style.display=w?'inline':'none';$('ok').style.display=w?'inline':'none';
+ if(w)$('lnk').href=o.approve_url;refresh();}
+async function scan(){
+ if(!token)return alert('Genera un QR primero');$('st').textContent='El agente está trabajando...';
+ const r=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
+ r.ok?show(await r.json()):$('st').textContent='Error: '+await r.text();}
+async function resume(a){
+ $('st').textContent='Verificando el pago con PayPal...';
+ const r=await fetch('/api/resume/'+tid,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approved:a})});
+ r.ok?show(await r.json()):$('st').textContent='Error: '+await r.text();}
+refresh();
+</script></body></html>
