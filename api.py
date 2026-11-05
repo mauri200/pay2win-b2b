@@ -78,3 +78,7 @@ def resume(tid: str, body: ResumeIn):
 @api.get("/api/orders")
 def orders():
     return list(reversed(list(ORDERS.values())))
+
+
+from app.chat_api import make_router
+api.include_router(make_router(ORDERS, _guardar))

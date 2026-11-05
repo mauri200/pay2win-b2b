@@ -1,65 +1,200 @@
 <!DOCTYPE html>
-<html lang="es"><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pay2Win paycon</title>
+<title>Pay2Win Store</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-grid.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-theme-quartz.css">
 <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.js"></script>
 <style>
-:root{--bg:#f6f7fb;--card:#fff;--tx:#14213d;--mut:#5b6478;--ac:#0b4fc4;--bd:#dde1ea}
-@media(prefers-color-scheme:dark){:root{--bg:#0f1420;--card:#171e2e;--tx:#e8ecf5;--mut:#9aa4ba;--ac:#6ea0ff;--bd:#2a3550}}
-*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--tx);padding:20px}
-h1{margin:0 0 4px}p.s{color:var(--mut);margin:0 0 18px}
-.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
-.c{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px}
-label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
-input,select{width:100%;padding:8px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx)}
-button{margin-top:12px;padding:9px 14px;border:0;border-radius:8px;background:var(--ac);color:#fff;cursor:pointer;font-weight:600}
-button.o{background:transparent;color:var(--ac);border:1px solid var(--ac)}
-img{max-width:200px;display:block;margin:10px auto}
-#st{white-space:pre-wrap;font-size:14px}#grid{height:300px;margin-top:16px}
+:root{--bg:#fff;--soft:#f4f5f8;--tx:#111827;--mut:#6b7280;--bd:#e5e7eb;--ac:#111827;--act:#fff;--ok:#16a34a;--bad:#dc2626;--blue:#0b4fc4}
+@media(prefers-color-scheme:dark){:root{--bg:#0d1117;--soft:#161b26;--tx:#e8ecf5;--mut:#9aa4ba;--bd:#262d3d;--ac:#e8ecf5;--act:#0d1117;--blue:#6ea0ff}}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--tx)}
+header{display:flex;align-items:center;gap:20px;padding:12px 24px;border-bottom:1px solid var(--bd);height:57px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px}
+.logo i{background:var(--ac);color:var(--act);border-radius:8px;width:30px;height:30px;display:grid;place-items:center;font-style:normal}
+nav button{background:none;border:0;padding:8px 14px;border-radius:8px;color:var(--mut);cursor:pointer;font-size:14px}
+nav button.on{background:var(--soft);color:var(--tx);font-weight:600}
+.layout{display:grid;grid-template-columns:1fr 380px;height:calc(100vh - 57px)}
+.store{overflow:auto;padding:24px 28px}
+.assist{border-left:1px solid var(--bd);display:flex;flex-direction:column;min-height:0}
+h1{margin:0;font-size:32px}.sub{color:var(--mut);margin:4px 0 16px}
+.chips{display:flex;gap:8px;align-items:center;margin-bottom:18px;min-height:30px;flex-wrap:wrap}
+.chip{background:var(--ac);color:var(--act);border-radius:99px;padding:5px 12px;font-size:13px;cursor:pointer}
+.clr{background:none;border:0;color:var(--mut);text-decoration:underline;cursor:pointer;font-size:13px}
+.shop{display:grid;grid-template-columns:200px 1fr;gap:26px}
+.f{border:1px solid var(--bd);border-radius:16px;padding:16px;align-self:start}
+.f h4{margin:0 0 8px;font-size:14px}.f label{display:flex;gap:8px;font-size:14px;margin:6px 0;color:var(--mut)}
+.f input[type=range]{width:100%}
+.prods{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:18px;align-content:start}
+.p{cursor:pointer}.p .img{height:170px;border-radius:16px;display:grid;place-items:center;font-size:64px;position:relative;border:2px solid transparent}
+.p.sel .img{border-color:var(--blue)}
+.tag{position:absolute;top:10px;left:10px;font-size:11px;background:var(--bg);color:var(--tx);padding:3px 9px;border-radius:99px;font-weight:600}
+.p small{color:var(--mut);display:block;margin-top:8px}.p b{display:block;margin-top:2px}.p .pr{font-weight:700;margin-top:2px}
+.p button{margin-top:8px;width:100%}
+button.b{padding:9px 14px;border-radius:99px;border:0;background:var(--ac);color:var(--act);cursor:pointer;font-weight:600;font-size:14px}
+button.o{padding:8px 14px;border-radius:99px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);cursor:pointer;font-size:13px}
+.ah{padding:16px 20px;border-bottom:1px solid var(--bd);font-size:14px}.ah span{color:var(--mut)}
+.chat{flex:1;overflow:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.m{background:var(--soft);padding:10px 14px;border-radius:14px;font-size:14px;max-width:95%;white-space:pre-wrap}
+.m.ok{border-left:4px solid var(--ok)}.m.bad{border-left:4px solid var(--bad)}
+.m img{display:block;width:170px;margin-top:8px;background:#fff;border-radius:8px}
+.m .row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.comp{border-top:1px solid var(--bd);padding:14px 20px}
+.comp label{font-size:12px;color:var(--mut);display:block;margin:6px 0 3px}
+.comp input,.comp select{width:100%;padding:8px 12px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--tx)}
+.comp .chips{margin:12px 0 0}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat,.panel{border:1px solid var(--bd);border-radius:16px;padding:16px}
+.stat span{font-size:12px;color:var(--mut)}.stat b{display:block;font-size:26px;margin-top:4px}
+.panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:12px 0}
+.panel h3{margin:0 0 12px;font-size:15px}.panel p{font-size:12px;color:var(--mut);margin:10px 0 0}
+.ins{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--bd);font-size:14px}
+.bar{height:10px;background:var(--soft);border-radius:99px;overflow:hidden;margin:10px 0}.bar i{display:block;height:100%;background:var(--ok)}
+.st{display:flex;gap:10px;align-items:center;font-size:14px;padding:5px 0;color:var(--mut)}
+.st u{width:14px;height:14px;border-radius:50%;border:2px solid var(--bd);display:inline-block}
+.st.d{color:var(--tx)}.st.d u{background:var(--ok);border-color:var(--ok)}.st.x{color:var(--bad)}.st.x u{background:var(--bad);border-color:var(--bad)}
+#grid{height:340px}.hide{display:none}
+@media(max-width:900px){.layout{grid-template-columns:1fr;height:auto}.assist{border-left:0;border-top:1px solid var(--bd);height:560px}.shop{grid-template-columns:1fr}}
+.gen{display:grid;grid-template-columns:210px 1fr 250px;gap:16px;margin:14px 0;align-items:start}
+.mono{font-family:ui-monospace,Consolas,monospace;font-size:12px}
+.lh{font-size:11px;letter-spacing:.08em;color:var(--mut);padding-bottom:6px;border-bottom:1px dashed var(--bd);margin-bottom:8px;text-align:right}
+.lr{display:flex;justify-content:space-between;padding:3px 0}.lr .d{color:var(--ok)}.lr .x{color:var(--bad)}
+pre#js{white-space:pre-wrap;word-break:break-all;margin:0;color:var(--mut);font-size:11px}
+.card{border:1px solid var(--bd);border-radius:18px;padding:20px}.card h3{margin:0 0 4px;font-size:18px}
+.ctl{margin:14px 0}.ctl label{display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px}.ctl input[type=range]{width:100%}
+.chk{display:flex;gap:10px;align-items:center;font-size:14px}
+.sum{background:var(--soft);border-radius:12px;padding:14px 16px}.sum span{font-size:12px;color:var(--mut)}.sum b{display:block;font-size:30px;margin:2px 0}.sum small{color:var(--mut);font-size:13px}
+.chart{display:flex;gap:10px;align-items:flex-end;height:190px;margin-top:8px}
+.col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px}
+.col em{font-size:11px;font-style:normal;color:var(--mut)}.col span{font-size:11px;color:var(--mut)}
+.bb{width:100%;background:var(--blue);border-radius:6px 6px 0 0;transition:height .3s}
+.note{font-size:12px;color:var(--mut);margin-top:12px;line-height:1.5}
+@media(max-width:1100px){.gen{grid-template-columns:1fr}}
+.kpiwrap{border:1px solid var(--bd);border-radius:18px;padding:44px 24px;display:flex;justify-content:center}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;width:100%;max-width:740px}
+.kpi{border:1px solid var(--bd);border-radius:16px;padding:14px 16px 0;overflow:hidden;background:var(--bg);box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.kh{display:flex;justify-content:space-between;align-items:center}.kh span{font-size:13px;color:var(--mut)}
+.kh i{width:26px;height:26px;border:1px solid var(--bd);border-radius:8px;display:grid;place-items:center;font-style:normal;font-size:12px;color:var(--mut)}
+.kpi b{display:block;font-size:30px;margin:10px 0 4px;color:var(--tx)}
+.kpi small{display:block;font-size:12px;color:var(--mut);margin-bottom:8px}
+.kpi svg{display:block;width:calc(100% + 32px);margin:0 -16px;height:44px}
+@media(max-width:700px){.kpis{grid-template-columns:1fr}}
+.cin{display:flex;gap:8px}.cin input{flex:1}details{margin-top:10px;font-size:13px;color:var(--mut)}summary{cursor:pointer}.m.u{align-self:flex-end;background:var(--ac);color:var(--act)}
 </style></head><body>
-<h1>Pay2Win paycon</h1>
-<p class="s">Un QR firmado con tope de gasto. El agente cotiza y crea la orden; tú apruebas en PayPal (Pay in 4).</p>
-<div class="g">
- <div class="c"><b>1. Generar QR</b>
-  <label>Producto</label><select id="q"><option>Laptop Dell i7</option><option>Smartphone Pixel</option><option>Audífonos Noise Cancelling</option><option>Monitor 4K 27 pulgadas</option><option>TV OLED 65 pulgadas</option></select>
-  <label>Tope de gasto (USD)</label><input id="m" type="number" value="600">
-  <label>Financiamiento</label><select id="f"><option value="pay_in_4">Pay in 4</option><option value="none">Pago completo</option></select>
-  <button onclick="genQR()">Generar QR</button><img id="qr" alt="">
+<header><div class="logo"><i>P</i>Pay2Win Store</div>
+<nav><button id="t1" class="on" onclick="tab(1)">Shop</button><button id="t2" onclick="tab(2)">Payments</button></nav></header>
+<div class="layout">
+<main class="store">
+ <section id="v1"><h1>All products</h1><p class="sub">Pick a product. Your assistant buys it within the spending cap you authorize.</p>
+  <div class="chips" id="chips"></div>
+  <div class="shop"><aside class="f"><h4>Category</h4><div id="cats"></div>
+   <h4 style="margin-top:20px">Max price: $<span id="pv">2000</span></h4>
+   <input type="range" id="pr" min="50" max="2000" step="10" value="2000" oninput="draw()"></aside>
+   <div class="prods" id="prods"></div></div></section>
+ <section id="v2" class="hide"><h1>Payments</h1><p class="sub">Agent-initiated payments, spending guardrails and a live installment estimator.</p>
+  <div class="kpiwrap"><div class="kpis" id="stats"></div></div>
+  <div class="gen">
+   <div class="mono"><div class="lh">AGENT.LOG // NODES <span id="lc"></span></div><div id="log"></div></div>
+   <div class="card"><h3>Payment plan estimator</h3><div class="note" style="margin:0 0 6px">Pay in 4 · interest-free · live preview</div>
+    <div class="ctl"><label><span>Purchase amount</span><b id="amt_v"></b></label><input type="range" id="amt" min="30" max="2000" step="10" value="450" oninput="rp()"></div>
+    <div class="ctl chk"><input type="checkbox" id="p4" checked onchange="rp()"><span>Pay in 4, interest-free</span></div>
+    <div class="sum" id="sum"></div>
+    <h4 style="margin:18px 0 0;font-size:15px">Cumulative paid over 6 weeks</h4>
+    <div class="chart" id="chart"></div><div class="note" id="note"></div></div>
+   <div class="mono"><div class="lh">ORDER.JSON // LATEST</div><pre id="js"></pre></div>
+  </div>
+  <div class="panel"><h3>Payment history</h3><div id="grid" class="ag-theme-quartz"></div></div></section>
+</main>
+<aside class="assist">
+ <div class="ah"><b>Pay2Win assistant</b> <span>(LangGraph + PayPal Agent Toolkit)</span></div>
+ <div class="chat" id="chat"></div>
+ <div class="comp"><div class="cin"><input id="ci" placeholder="e.g. Buy a laptop and headphones, max $600 total"><button class="b" onclick="send()">Send</button></div><details><summary>Manual mode (single product)</summary>
+  <label>Authorized spending cap (USD)</label><input id="cap" type="number" value="600" oninput="rp()">
+  <label>Financing</label><select id="fin"><option value="pay_in_4">Pay in 4</option><option value="none">Pay in full</option></select>
+  <div class="chips"><button class="o" onclick="genQR()">1. Generate QR</button><button class="o" onclick="scan()">2. Scan QR</button></div></details>
  </div>
- <div class="c"><b>2. Escanear y aprobar</b>
-  <div><button onclick="scan()">Escanear QR</button></div>
-  <p id="st">Genera un QR para empezar.</p>
-  <a id="lnk" target="_blank" style="display:none"><button class="o">Abrir en PayPal</button></a>
-  <button id="ok" style="display:none" onclick="resume(true)">Ya aprobé: cobrar</button>
- </div>
-</div>
-<div class="c" style="margin-top:16px"><b>Historial de órdenes</b><div id="grid" class="ag-theme-quartz"></div></div>
+</aside></div>
 <script>
-let token=null,tid=null;
-const $=id=>document.getElementById(id);
-const grid=agGrid.createGrid($('grid'),{
- columnDefs:[{field:'creado',headerName:'Hora',width:100},{field:'producto',headerName:'Producto',flex:1},
-  {field:'monto',headerName:'USD',width:100},{field:'financiamiento',headerName:'Financ.',width:110},
-  {field:'estado',headerName:'Estado',width:190},{field:'mensaje',headerName:'Detalle',flex:2}],
- rowData:[]});
-async function refresh(){grid.setGridOption('rowData',await (await fetch('/api/orders')).json())}
+const P=[{n:'Dell i7 Laptop',q:'Laptop Dell i7',p:450,c:'Computing',e:'💻',g:'#dbeafe'},{n:'Pixel Smartphone',q:'Smartphone Pixel',p:320,c:'Phones',e:'📱',g:'#dcfce7'},
+{n:'Noise Cancelling Headphones',q:'Noise Cancelling Headphones',p:89.9,c:'Audio',e:'🎧',g:'#fde68a'},{n:'27-inch 4K Monitor',q:'27-inch 4K Monitor',p:279,c:'Displays',e:'🖥️',g:'#e9d5ff'},
+{n:'65-inch OLED TV',q:'65-inch OLED TV',p:1899,c:'Displays',e:'📺',g:'#fecaca'}];
+const LAB={completado:'Completed',rechazado:'Rejected',esperando_aprobacion:'Awaiting approval',error:'Error',error_captura:'Capture failed',cancelado:'Canceled'};
+const lab=e=>LAB[e]||e;
+const TL=['QR verified','Quote within cap','Pay Later check','Order created','Buyer approval','Payment captured'];
+const PROG={esperando_aprobacion:[4],completado:[6],rechazado:[1,1],error:[3,3],cancelado:[4,4],error_captura:[5,5]};
+let cartMode=false,mand=null,sel=null,token=null,tid=null,grid=null,O=[],cats=new Set();const $=i=>document.getElementById(i),chat=$('chat');
+const money=v=>'$'+Number(v).toFixed(2);
+function msg(t,cls,extra){const d=document.createElement('div');d.className='m '+(cls||'');d.textContent=t;
+ if(extra)d.appendChild(extra);chat.appendChild(d);chat.scrollTop=chat.scrollHeight}
+$('cats').innerHTML=[...new Set(P.map(x=>x.c))].map(c=>`<label><input type="checkbox" value="${c}" onchange="tg('${c}')"> ${c}</label>`).join('');
+function tg(c){cats.has(c)?cats.delete(c):cats.add(c);draw()}
+function clr(){cats.clear();document.querySelectorAll('#cats input').forEach(i=>i.checked=false);draw()}
+function draw(){
+ const mx=+$('pr').value;$('pv').textContent=mx;
+ $('chips').innerHTML=[...cats].map(c=>`<span class="chip" onclick="document.querySelector('#cats input[value=${c}]').click()">${c} ×</span>`).join('')+(cats.size?'<button class="clr" onclick="clr()">Clear all</button>':'');
+ $('prods').innerHTML=P.map((x,i)=>({x,i})).filter(o=>(!cats.size||cats.has(o.x.c))&&o.x.p<=mx).map(({x,i})=>
+ `<div class="p ${sel===x?'sel':''}" onclick="pick(${i})"><div class="img" style="background:${x.g}"><span class="tag">${x.c}</span>${x.e}</div>
+ <small>${x.c}</small><b>${x.n}</b><div class="pr">${money(x.p)}</div><button class="o">Buy with Pay2Win</button></div>`).join('')}
+function pick(i){sel=P[i];token=null;$('amt').value=sel.p;draw();rp();msg(`You selected ${sel.n} (${money(sel.p)}). Set your cap and generate the QR.`)}
 async function genQR(){
- const p=new URLSearchParams({query:$('q').value,max_amount:$('m').value,financing:$('f').value});
- const r=await (await fetch('/api/qr?'+p)).json();token=r.token;$('qr').src=r.png;$('st').textContent='QR listo. Pulsa "Escanear QR".';}
+ if(!sel)return msg('Pick a product in the shop first.');
+ const q=new URLSearchParams({query:sel.q,max_amount:$('cap').value,financing:$('fin').value});
+ const r=await(await fetch('/api/qr?'+q)).json();token=r.token;const im=new Image();im.src=r.png;
+ msg(`Signed QR ready (cap $${$('cap').value}). Press "Scan QR".`,'',im)}
 function show(o){
- tid=o.thread_id;const w=o.estado==='esperando_aprobacion';
- $('st').textContent=`Estado: ${o.estado}\n${o.producto?o.producto+' - $'+o.monto:''}\n${o.mensaje||''}`;
- $('lnk').style.display=w?'inline':'none';$('ok').style.display=w?'inline':'none';
- if(w)$('lnk').href=o.approve_url;refresh();}
-async function scan(){
- if(!token)return alert('Genera un QR primero');$('st').textContent='El agente está trabajando...';
- const r=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
- r.ok?show(await r.json()):$('st').textContent='Error: '+await r.text();}
-async function resume(a){
- $('st').textContent='Verificando el pago con PayPal...';
- const r=await fetch('/api/resume/'+tid,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approved:a})});
- r.ok?show(await r.json()):$('st').textContent='Error: '+await r.text();}
-refresh();
+ tid=o.thread_id;const w=o.estado==='esperando_aprobacion',cls=o.estado==='completado'?'ok':(w?'':'bad'),ex=document.createElement('div');ex.className='row';
+ if(w){const a=document.createElement('a');a.href=o.approve_url;a.target='_blank';a.innerHTML='<button class="b">Open in PayPal</button>';
+  const b=document.createElement('button');b.className='o';b.textContent="I've approved: capture";b.onclick=resume;ex.append(a,b)}
+ msg(`Status: ${lab(o.estado)}${o.producto?'\n'+o.producto+' - '+money(o.monto):''}${o.mensaje?'\n'+o.mensaje:''}`,cls,w?ex:null);refresh()}
+async function post(u,b){const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+ if(!r.ok){msg('Error: '+await r.text(),'bad');return null}return r.json()}
+async function scan(){cartMode=false;if(!token)return msg('Generate a QR first.');msg('The agent is quoting and creating the order in PayPal...');
+ const o=await post('/api/scan',{token});if(o)show(o)}
+async function resume(){msg('Verifying the payment with PayPal...');const o=await post((cartMode?'/api/cart/resume/':'/api/resume/')+tid,{approved:true});if(o)show(o)}
+async function refresh(){O=await(await fetch('/api/orders')).json();if(grid)grid.setGridOption('rowData',O);rp()}
+function spark(v){
+ const a=v.length>1?v:(v.length?[0,v[0]]:[0,0]),mx=Math.max(...a,1),
+ pts=a.map((x,i)=>[i/(a.length-1)*200,40-x/mx*32]),ln=pts.map((q,i)=>(i?'L':'M')+q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' ');
+ return `<svg viewBox="0 0 200 44" preserveAspectRatio="none"><path d="${ln} L200 44 L0 44 Z" fill="currentColor" opacity=".12"/><path d="${ln}" fill="none" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`}
+function kpis(paid){
+ const A=[...O].reverse(),cum=f=>{let s=0;return A.map(o=>s+=f(o))},
+ tot=paid.reduce((s,o)=>s+o.monto,0),blk=O.filter(o=>o.estado==='rechazado').length,wait=O.filter(o=>o.estado==='esperando_aprobacion').length,last=paid[0];
+ const K=[['Total paid',money(tot),'$','#2563eb',cum(o=>o.estado==='completado'?o.monto:0),last?`↗ +${money(last.monto)} last payment`:'No payments yet'],
+  ['Payments completed',paid.length,'✓','#7c3aed',cum(o=>o.estado==='completado'?1:0),`${wait} awaiting approval`],
+  ['Blocked by cap',blk,'!','#059669',cum(o=>o.estado==='rechazado'?1:0),O.length?`${blk} of ${O.length} attempts`:'No attempts yet']];
+ $('stats').innerHTML=K.map(([a,b,g,c,s,d])=>`<div class="kpi" style="color:${c}"><div class="kh"><span>${a}</span><i>${g}</i></div><b>${b}</b><small>${d}</small>${spark(s)}</div>`).join('')}
+function rp(){
+ const paid=O.filter(o=>o.estado==='completado');
+ kpis(paid);
+ const amt=+$('amt').value,cap=+$('cap').value,p4=$('p4').checked,ok4=amt>=30&&amt<=1500,use=p4&&ok4,per=amt/4;
+ $('amt_v').textContent=money(amt);
+ $('sum').innerHTML=`<span>Due today</span><b>${money(use?per:amt)}</b><small>${use?`4 interest-free installments of ${money(per)} · total ${money(amt)}`:`Pay in full · total ${money(amt)}`}</small>`;
+ $('note').innerHTML=(p4&&!ok4?'Pay in 4 usually applies to purchases between $30 and $1,500, so this amount would be paid in full.<br>':'')+
+  (amt>cap?`<span style="color:var(--bad)">Over your cap (${money(cap)}): the agent will refuse this purchase.</span>`:'Within your cap: the agent can proceed.')+
+  '<br>Illustrative schedule; PayPal sets the real one at checkout.';
+ const wk=[0,1,2,3,4,5,6].map(w=>use?per*Math.min(4,Math.floor(w/2)+1):amt),mx=Math.max(...wk);
+ $('chart').innerHTML=wk.map((v,w)=>`<div class="col"><em>${money(v).replace('.00','')}</em><div class="bb" style="height:${v/mx*140}px"></div><span>W${w}</span></div>`).join('');
+ const L=O[0],N=['read_qr','quote','paylater','create_order','approval','capture'],[dn,fl]=L?(PROG[L.estado]||[0]):[0];
+ $('lc').textContent=L?dn+'/6':'-';
+ $('log').innerHTML=L?N.map((n,i)=>{const f=fl&&i===fl,w=!f&&i===dn&&L.estado==='esperando_aprobacion';
+  return `<div class="lr"><span>${n}</span><span class="${f?'x':(i<dn?'d':'')}">${f?'[fail]':(i<dn?'[ ok ]':(w?'[wait]':'[ -- ]'))}</span></div>`}).join(''):'<div class="lr"><span>no runs yet</span></div>';
+ $('js').textContent=L?JSON.stringify(L,null,1):'{}';
+}
+function tab(n){$('v1').classList.toggle('hide',n!==1);$('v2').classList.toggle('hide',n!==2);
+ $('t1').classList.toggle('on',n===1);$('t2').classList.toggle('on',n===2);
+ if(n===2){if(!grid)grid=agGrid.createGrid($('grid'),{rowData:O,columnDefs:[{field:'creado',headerName:'Time',width:95},
+  {field:'producto',headerName:'Product',flex:1},{field:'monto',headerName:'USD',width:90},{field:'financiamiento',headerName:'Financing',width:110},
+  {field:'estado',headerName:'Status',width:170,valueFormatter:p=>lab(p.value),cellStyle:p=>({color:p.value==='completado'?'#16a34a':(p.value==='rechazado'?'#dc2626':'inherit'),fontWeight:600})},
+  {field:'order_id',headerName:'PayPal order',width:170},{field:'mensaje',headerName:'Details',flex:2,wrapText:true,autoHeight:true}]});refresh()}}
+async function send(){
+ const q=$('ci').value.trim();if(!q)return;$('ci').value='';msg(q,'u');msg('Thinking...');
+ const r=await post('/api/chat',{message:q});if(!r)return;
+ if(!r.mandate)return msg(r.reply);
+ mand=r.mandate;const im=new Image();im.src=mand.png;const b=document.createElement('button'),w=document.createElement('div'),ex=document.createElement('div');
+ b.className='b';b.textContent='Approve mandate';b.onclick=startCart;ex.className='row';ex.append(b);w.append(im,ex);
+ msg(`${r.reply}\n\nMandate:\n`+mand.items.map(i=>`• ${i.name} ${money(i.price)}`).join('\n')+`\nTotal ${money(mand.total)} · budget ${money(mand.budget)} · per-item cap ${money(mand.per_item_cap)} · ${mand.financing==='pay_in_4'?'Pay in 4':'Pay in full'}\nValid 15 min. One PayPal approval covers the whole cart.`,'',w)}
+async function startCart(){cartMode=true;msg('Mandate approved. The agent is quoting the cart and creating one PayPal order...');
+ const o=await post('/api/cart/start',{token:mand.token});if(o)show(o)}
+$('ci').addEventListener('keydown',e=>{if(e.key==='Enter')send()});
+draw();rp();msg('Hi, I am your shopping agent. Tell me what to buy and your budget. I will propose a signed mandate; once you approve it, I buy the whole cart in one PayPal order, with a single approval from you.');
 </script></body></html>
