@@ -1,0 +1,10 @@
+# B2B module dependencies (the root requirements.txt already covers most).
+# Python HTTP client for Channel3 is `requests` (no SDK required).
+fastapi
+uvicorn
+langgraph>=0.2.60
+langchain-groq
+requests
+pyjwt
+qrcode[pil]
+python-dotenv
