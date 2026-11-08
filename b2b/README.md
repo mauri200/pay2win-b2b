@@ -52,7 +52,9 @@ b2b/
   team.py              supervisor LangGraph + interrupt/capture
   mandate.py           QR/JWT firmado (misma raíz de confianza que app/qr.py)
   channel3.py          proveedor Channel3 + catálogo local de respaldo
-  ledger.py            ledger en memoria para el dashboard
+  db.py                conexión Postgres (DATABASE_URL) o SQLite local
+  ledger.py            ledger persistente para el dashboard
+  checkpointer.py      checkpointer persistente de LangGraph
   webhooks.py          verificación de firma y eventos PayPal
   subagents/
     procurement.py     compra + stock
@@ -89,12 +91,24 @@ npm run dev      # http://localhost:5174 (proxy /api -> :8001)
 npm run build    # genera dist/, servido por b2b/api.py
 ```
 
+## Persistencia
+
+El ledger de delegaciones, los eventos PayPal y el estado del grafo (interrupt
+de aprobación) se guardan en Postgres cuando existe `DATABASE_URL`. Sin esa
+variable se usa SQLite local en `b2b/data/b2b.sqlite3` y
+`b2b/data/checkpoints.sqlite3`, de modo que reiniciar el proceso no pierde
+delegaciones ni la aprobación pendiente. Las tablas se crean de forma
+idempotente al arrancar.
+
 ## Variables de entorno
 
 Se reutilizan `QR_SECRET`, `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`,
 `GROQ_MODEL` y `GROQ_API_KEY` del `.env` raíz. Opcionales:
 
 ```ini
+DATABASE_URL=              # Postgres; si falta, SQLite local
+B2B_SQLITE_PATH=           # opcional: ruta del SQLite local
+B2B_CHECKPOINT_PATH=       # opcional: ruta del checkpointer SQLite
 CHANNEL3_API_KEY=          # si falta, catálogo local de respaldo
 CHANNEL3_MODE=agentic      # default | agentic | keyword
 B2B_CURRENCY=USD
@@ -110,6 +124,32 @@ B2B_NOTIFY_WEBHOOK_URL=    # opcional: Slack-compatible incoming webhook
 
 `paypal` aparece como `simulated` en `/api/b2b/health` cuando no hay
 credenciales; el flujo completo sigue funcionando en modo demo.
+
+## Despliegue en Render
+
+`render.yaml` define dos servicios: `pay2win-paycon` (B2C, sin cambios) y
+`pay2win-b2b` (este módulo). El B2B usa runtime Python nativo y sirve el
+dashboard ya construido en `b2b/dashboard/dist`. El `QR_SECRET` se comparte
+automáticamente desde el servicio B2C mediante `fromService`, así ambos flujos
+mantienen la misma raíz de confianza sin copiar el secreto a mano.
+
+- Build: `pip install -r requirements.txt -r b2b/requirements.txt`
+- Start: `uvicorn b2b.api:api --host 0.0.0.0 --port $PORT`
+- Health check: `/api/b2b/health`
+- Base de datos recomendada: Neon free Postgres (`DATABASE_URL` con
+  `?sslmode=require`). Render Postgres free expira a los 30 días.
+- El pool desactiva prepared statements, así que también funciona la cadena
+  pooled de Neon (PgBouncer).
+- `QR_SECRET` se toma del servicio B2C con `fromService`; no hace falta
+  configurarlo dos veces.
+- Configura en el servicio B2B las mismas credenciales de PayPal y Groq que usa
+  el B2C (o cámbialas a `fromService` si prefieres heredarlas).
+- El plan free de Render duerme el servicio a los 15 minutos; PayPal reintenta
+  los webhooks, pero la primera entrega puede tardar en despertar el servicio.
+
+Tras el deploy, registra el webhook en PayPal con la URL
+`https://<servicio>.onrender.com/api/b2b/paypal/webhook` y copia el Webhook ID
+a `PAYPAL_WEBHOOK_ID`.
 
 ### Notificaciones PayPal (webhooks)
 

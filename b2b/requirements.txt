@@ -8,3 +8,6 @@ requests
 pyjwt
 qrcode[pil]
 python-dotenv
+psycopg[binary,pool]>=3.2,<4
+langgraph-checkpoint-postgres>=3,<4
+langgraph-checkpoint-sqlite>=3,<4

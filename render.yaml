@@ -18,3 +18,37 @@ services:
         value: llama-3.3-70b-versatile
       - key: QR_SECRET
         generateValue: true
+
+  - type: web
+    name: pay2win-b2b
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt -r b2b/requirements.txt
+    startCommand: uvicorn b2b.api:api --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/b2b/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
+      - key: DATABASE_URL
+        sync: false
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_API_BASE
+        value: https://api-m.sandbox.paypal.com
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: QR_SECRET
+        fromService:
+          name: pay2win-paycon
+          type: web
+          envVarKey: QR_SECRET
+      - key: CHANNEL3_API_KEY
+        sync: false
+      - key: B2B_NOTIFY_WEBHOOK_URL
+        sync: false

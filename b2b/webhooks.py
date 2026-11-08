@@ -1,7 +1,7 @@
 """PayPal webhook handling for the B2B module.
 
 Verifies the PayPal transmission signature (when PAYPAL_WEBHOOK_ID is set),
-records the event in the in-memory ledger so the dashboard can display it, and
+records the event in the persistent ledger so the dashboard can display it, and
 optionally forwards a short notification to a Slack-compatible webhook URL.
 
 PayPal docs: /v1/notifications/verify-webhook-signature
@@ -142,6 +142,7 @@ def handle_event(event: dict, headers: dict) -> dict:
         verified=verified,
         detail=detail,
         amount=_event_amount(event),
+        payload=event,
     )
     _forward(event_type, order_id, _event_amount(event))
     log.info("PayPal webhook %s for order %s (verified=%s, rows=%d)",

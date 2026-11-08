@@ -12,10 +12,10 @@ from __future__ import annotations
 
 from typing import Optional, TypedDict
 
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.types import interrupt
 
+from .checkpointer import get_checkpointer
 from .mandate import validate_mandate
 from .subagents import REGISTRY
 from .subagents import payments as payments_agent
@@ -150,7 +150,7 @@ def n_notify(s: B2BState) -> dict:
     return {}
 
 
-def build_team():
+def build_team(checkpointer=None):
     g = StateGraph(B2BState)
     g.add_node("read", n_read)
     g.add_node("supervise", n_supervise)
@@ -174,4 +174,4 @@ def build_team():
     g.add_conditional_edges("wait", _route_wait, {"capture": "capture", "notify": "notify"})
     g.add_edge("capture", "notify")
     g.add_edge("notify", END)
-    return g.compile(checkpointer=MemorySaver())
+    return g.compile(checkpointer=checkpointer or get_checkpointer())

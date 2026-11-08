@@ -10,6 +10,7 @@ import json
 import os
 import re
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional
 
@@ -20,13 +21,28 @@ from langchain_groq import ChatGroq
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
-from . import config, ledger, paypal_client, webhooks
+from . import config, db, ledger, paypal_client, webhooks
 from .channel3 import Channel3Provider, product_catalog_snapshot
+from .checkpointer import close_checkpointer
 from .mandate import create_mandate, mandate_qr_data_uri, validate_mandate
 from .team import build_team
 
-api = FastAPI(title="Pay2Win B2B", version="1.0")
-team = build_team()
+team = None
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    global team
+    ledger.init_db()
+    team = build_team()
+    try:
+        yield
+    finally:
+        close_checkpointer()
+        db.close_pool()
+
+
+api = FastAPI(title="Pay2Win B2B", version="1.0", lifespan=lifespan)
 
 BASE = Path(__file__).resolve().parent
 DIST = BASE / "dashboard" / "dist"
@@ -71,10 +87,16 @@ class Intent(BaseModel):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+def _team():
+    if team is None:
+        raise HTTPException(503, "Equipo no inicializado")
+    return team
+
+
 def _run(token: str) -> dict:
     tid = str(uuid.uuid4())
     try:
-        res = team.invoke({"mandate_token": token}, {"configurable": {"thread_id": tid}})
+        res = _team().invoke({"mandate_token": token}, {"configurable": {"thread_id": tid}})
     except Exception as e:
         raise HTTPException(500, str(e))
     intr = res.get("__interrupt__")
@@ -170,6 +192,8 @@ def health():
         "channel3": "live" if config.CHANNEL3_API_KEY else "fallback-catalog",
         "paypal": "sandbox" if not config.SIMULATE_PAYMENTS else "simulated",
         "paypal_webhook": "signature-verified" if config.PAYPAL_WEBHOOK_ID else "unverified-demo",
+        "persistence": "postgres" if db.is_postgres() else "sqlite",
+        "checkpointer": "postgres" if db.is_postgres() else "sqlite",
         "external_notify": bool(config.NOTIFY_WEBHOOK_URL),
         "groq": bool(config.GROQ_API_KEY),
         "subagents": list(config.ALL_SUBAGENTS),
@@ -233,8 +257,8 @@ def approve(tid: str, body: ApproveIn):
             )
 
     try:
-        res = team.invoke(Command(resume={"approved": body.approved}),
-                          {"configurable": {"thread_id": tid}})
+        res = _team().invoke(Command(resume={"approved": body.approved}),
+                             {"configurable": {"thread_id": tid}})
     except Exception as e:
         raise HTTPException(500, str(e))
     return ledger.upsert(tid, res)
