@@ -20,6 +20,142 @@ const COLOR = { completado: '#16a34a', esperando_aprobacion: '#d97706', rechazad
 
 const usd = p => p.value == null ? '' : '$' + Number(p.value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmt = v => '$' + Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug']
+const compactUsd = v => {
+  const n = Number(v || 0)
+  if (Math.abs(n) >= 1e6) return '$' + (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M'
+  if (Math.abs(n) >= 1e3) return '$' + Math.round(n / 1e3) + 'k'
+  return '$' + Math.round(n)
+}
+
+const STATUS_LABEL = {
+  ...LABEL,
+  captured: 'Captured', pending: 'Pending', verified: 'Verified', unverified: 'Unverified',
+  paypal_sandbox: 'PayPal sandbox', simulated: 'Simulated',
+}
+const pretty = v => v ? String(v).replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase()) : ''
+const statusLabel = v => STATUS_LABEL[v] || pretty(v)
+
+function buildPaymentOps(rows) {
+  const out = []
+  for (const row of rows) {
+    const payments = row.payments || []
+    const last = payments[payments.length - 1] || {}
+    const trace = row.trace || []
+    for (let n = trace.length - 1; n >= 0; n -= 1) {
+      const t = trace[n]
+      if (t.agent !== 'treasury' && t.agent !== 'payments') continue
+      const data = t.data || {}
+      const isPayment = t.agent === 'payments'
+      const summary = t.summary || ''
+      let operation = isPayment ? 'Create PayPal order' : 'Authorize spend'
+      if (isPayment && /captur/i.test(summary)) operation = 'Capture payment'
+      else if (isPayment && /error|fallo|bloquead/i.test(summary)) operation = 'Payment error'
+      else if (!isPayment && /insuficiente|bloquead/i.test(summary)) operation = 'Budget blocked'
+      out.push({
+        id: `${row.thread_id}-trace-${n}`,
+        time: t.ts || row.created,
+        subagent: t.agent,
+        operation,
+        objective: row.objective || '—',
+        order_id: data.order_id || row.order_id || '',
+        mode: data.mode || row.payment_mode || 'simulated',
+        amount: Number((isPayment ? last.amount : row.grand_total) || 0),
+        status: isPayment ? (last.captured ? 'captured' : (last.paypal_status || 'pending')) : row.status,
+      })
+    }
+    const events = row.paypal_events || []
+    for (let n = events.length - 1; n >= 0; n -= 1) {
+      const e = events[n]
+      out.push({
+        id: `${row.thread_id}-event-${n}`,
+        time: e.ts || row.created,
+        subagent: 'paypal-webhook',
+        operation: e.event_type || 'PayPal event',
+        objective: row.objective || '—',
+        order_id: e.order_id || row.order_id || '',
+        mode: 'paypal_sandbox',
+        amount: Number(e.amount || 0),
+        status: e.verified ? 'verified' : 'unverified',
+      })
+    }
+  }
+  return out
+}
+
+function buildSourcingUsage(rows) {
+  const out = []
+  for (const row of rows) {
+    const items = row.items || []
+    for (let n = 0; n < items.length; n += 1) {
+      const i = items[n]
+      const qty = Number(i.qty || 0)
+      const unit = Number(i.unit_price || 0)
+      out.push({
+        id: `${row.thread_id}-item-${n}`,
+        time: row.created,
+        product: i.name || '—',
+        objective: row.objective || '—',
+        supplier: i.supplier || '—',
+        qty,
+        unit_price: unit,
+        line_total: Math.round(qty * unit * 100) / 100,
+        source: i.source || 'local',
+        stock: Number(i.stock || 0),
+        origin: i.origin || '—',
+        hs_code: i.hs_code || '—',
+      })
+    }
+  }
+  return out
+}
+
+function buildRevenueSeries(rows) {
+  const list = rows
+    .filter(r => r && r.created_ts)
+    .slice()
+    .sort((a, b) => Number(a.created_ts) - Number(b.created_ts))
+    .slice(-10)
+  if (list.length >= 2) {
+    return {
+      sample: false,
+      data: list.map(r => ({
+        label: r.created || new Date(Number(r.created_ts) * 1000)
+          .toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        committed: Number(r.grand_total || 0),
+        captured: r.status === 'completado' ? Number(r.grand_total || 0) : 0,
+      })),
+    }
+  }
+  const base = list.length ? Number(list[0].grand_total || 0) : 4200
+  return {
+    sample: true,
+    data: MONTHS.map((label, i) => {
+      const committed = Math.round(base * (0.9 + i * 0.14))
+      return { label, committed, captured: Math.round(committed * (0.6 + (i % 3) * 0.08)) }
+    }),
+  }
+}
+
+function buildTrafficSources(sourceRows, opsRows) {
+  const data = [
+    { label: 'Channel3 live', value: sourceRows.filter(r => r.source === 'channel3').length, color: '#2563EB' },
+    { label: 'Local catalog', value: sourceRows.filter(r => r.source === 'local').length, color: '#EA580C' },
+    { label: 'PayPal operations', value: opsRows.filter(r => r.subagent === 'payments').length, color: '#0D9488' },
+    { label: 'Webhook events', value: opsRows.filter(r => r.subagent === 'paypal-webhook').length, color: '#4F46E5' },
+  ]
+  const sum = data.reduce((s, d) => s + d.value, 0)
+  if (sum > 0) return { data, sample: false }
+  return {
+    sample: true,
+    data: [
+      { label: 'Channel3 live', value: 46, color: '#2563EB' },
+      { label: 'Local catalog', value: 28, color: '#EA580C' },
+      { label: 'PayPal operations', value: 18, color: '#0D9488' },
+      { label: 'Webhook events', value: 8, color: '#4F46E5' },
+    ],
+  }
+}
 
 const gridTheme = themeQuartz.withParams({
   accentColor: '#2563EB',
@@ -159,6 +295,98 @@ const Sparkline = memo(function Sparkline({ values }) {
   )
 })
 
+const RevenueTrendChart = memo(function RevenueTrendChart({ rows }) {
+  const { data, sample } = useMemo(() => buildRevenueSeries(rows), [rows])
+  const W = 760
+  const H = 240
+  const pad = { l: 54, r: 18, t: 16, b: 32 }
+  const innerW = W - pad.l - pad.r
+  const innerH = H - pad.t - pad.b
+  const max = Math.max(1, ...data.map(d => Math.max(d.committed, d.captured)))
+  const ticks = [0, 0.25, 0.5, 0.75, 1]
+  const px = i => pad.l + (data.length > 1 ? (i / (data.length - 1)) * innerW : innerW / 2)
+  const py = v => pad.t + (1 - v / max) * innerH
+  const lineFor = key => data.map((d, i) => `${i ? 'L' : 'M'}${px(i).toFixed(1)} ${py(d[key]).toFixed(1)}`).join(' ')
+  const areaFor = key => `${lineFor(key)} L ${px(data.length - 1).toFixed(1)} ${pad.t + innerH} L ${px(0).toFixed(1)} ${pad.t + innerH} Z`
+  const labelEvery = data.length > 8 ? 2 : 1
+
+  return (
+    <div className="revenue-chart">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img"
+        aria-label={sample ? 'Sample revenue trend' : 'Revenue trend across recent delegations'}>
+        <defs>
+          <linearGradient id="revCommittedFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#2563EB" stopOpacity="0.24" />
+            <stop offset="100%" stopColor="#2563EB" stopOpacity="0" />
+          </linearGradient>
+          <linearGradient id="revCapturedFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#EA580C" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="#EA580C" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {ticks.map(t => {
+          const y = pad.t + (1 - t) * innerH
+          return (
+            <g key={t}>
+              <line className="rev-grid" x1={pad.l} x2={W - pad.r} y1={y} y2={y} />
+              <text className="rev-axis" x={pad.l - 10} y={y + 4} textAnchor="end">{compactUsd(max * t)}</text>
+            </g>
+          )
+        })}
+        <path d={areaFor('committed')} fill="url(#revCommittedFill)" />
+        <path d={areaFor('captured')} fill="url(#revCapturedFill)" />
+        <path d={lineFor('committed')} className="rev-line committed" />
+        <path d={lineFor('captured')} className="rev-line captured" />
+        {data.map((d, i) => (
+          <g key={i}>
+            <circle className="rev-dot committed" cx={px(i)} cy={py(d.committed)} r="3.5">
+              <title>{`${d.label} · committed ${fmt(d.committed)}`}</title>
+            </circle>
+            {d.captured > 0 && (
+              <circle className="rev-dot captured" cx={px(i)} cy={py(d.captured)} r="3.5">
+                <title>{`${d.label} · captured ${fmt(d.captured)}`}</title>
+              </circle>
+            )}
+            {(i % labelEvery === 0 || i === data.length - 1) && (
+              <text className="rev-axis" x={px(i)} y={H - 8} textAnchor="middle">{d.label}</text>
+            )}
+          </g>
+        ))}
+      </svg>
+    </div>
+  )
+})
+
+const TrafficSources = memo(function TrafficSources({ sourceRows, opsRows }) {
+  const { data, sample } = useMemo(() => buildTrafficSources(sourceRows, opsRows), [sourceRows, opsRows])
+  const total = data.reduce((s, d) => s + d.value, 0)
+  return (
+    <div className="source-chart">
+      <div className="source-total">
+        <span>Total signals</span>
+        <b>{total.toLocaleString('en-US')}</b>
+      </div>
+      <div className="source-list">
+        {data.map(d => {
+          const pct = total ? Math.round((d.value / total) * 100) : 0
+          return (
+            <div className="source-row" key={d.label}>
+              <div className="source-top">
+                <span className="source-name"><i style={{ background: d.color }} aria-hidden="true" />{d.label}</span>
+                <span className="source-value">{d.value}<em>{pct}%</em></span>
+              </div>
+              <div className="source-track">
+                <div className="source-fill" style={{ width: `${pct}%`, background: d.color }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      {sample && <p className="analytics-note">Sample distribution until the first delegations land.</p>}
+    </div>
+  )
+})
+
 function IconBadge({ Icon, tone = 'blue' }) {
   return (
     <span className={`icon-badge tone-${tone}`} aria-hidden="true">
@@ -184,6 +412,15 @@ const ApproveButton = memo(function ApproveButton(params) {
       Approve
     </button>
   )
+})
+
+const TagCell = memo(function TagCell(params) {
+  const text = String(params.valueFormatted ?? params.value ?? '')
+  const tone = /error|fail|reject|unverified|blocked/i.test(text) ? 'bad'
+    : /channel3|sandbox|captur|complet|verif|approved|treasury ok/i.test(text) ? 'ok'
+      : /local|simulat|await|pending/i.test(text) ? 'warn'
+        : 'neutral'
+  return <span className={`tag tag-${tone}`}>{text}</span>
 })
 
 function Detail({ row }) {
@@ -361,6 +598,8 @@ export default function App() {
   const [rows, setRows] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [q, setQ] = useState('')
+  const [qOps, setQOps] = useState('')
+  const [qSource, setQSource] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [mandate, setMandate] = useState(null)
@@ -374,6 +613,8 @@ export default function App() {
     scope: SUBAGENTS,
   })
   const grid = useRef(null)
+  const opsGrid = useRef(null)
+  const sourceGrid = useRef(null)
 
   const load = useCallback(() => {
     fetch('/api/b2b/orders').then(r => r.json()).then(setRows).catch(() => {})
@@ -471,6 +712,41 @@ export default function App() {
   const defaultColDef = useMemo(() => ({ sortable: true, resizable: true }), [])
   const getRowId = useCallback(p => p.data.thread_id, [])
 
+  const opsRows = useMemo(() => buildPaymentOps(rows), [rows])
+  const sourceRows = useMemo(() => buildSourcingUsage(rows), [rows])
+
+  const opsCols = useMemo(() => [
+    { field: 'time', headerName: 'Time', width: 92 },
+    { field: 'subagent', headerName: 'Subagent', width: 128, filter: true, valueFormatter: p => pretty(p.value) },
+    { field: 'operation', headerName: 'Operation', width: 178, filter: true },
+    { field: 'objective', headerName: 'Delegation', flex: 2, minWidth: 190, filter: true, tooltipValueGetter: p => p.value },
+    { field: 'order_id', headerName: 'Order', width: 164, filter: true },
+    { field: 'mode', headerName: 'Mode', width: 140, filter: true, valueFormatter: p => statusLabel(p.value), cellRenderer: TagCell },
+    { field: 'amount', headerName: 'Amount', width: 116, filter: 'agNumberColumnFilter', valueFormatter: usd, cellStyle: { fontWeight: 600 } },
+    { field: 'status', headerName: 'Status', width: 148, filter: true, valueFormatter: p => statusLabel(p.value), cellRenderer: TagCell },
+  ], [])
+
+  const sourceCols = useMemo(() => [
+    { field: 'time', headerName: 'Time', width: 92 },
+    { field: 'product', headerName: 'Product', flex: 2, minWidth: 190, filter: true },
+    { field: 'objective', headerName: 'Delegation', flex: 2, minWidth: 170, filter: true, tooltipValueGetter: p => p.value },
+    { field: 'supplier', headerName: 'Supplier', flex: 1, minWidth: 140, filter: true },
+    { field: 'qty', headerName: 'Qty', width: 74, filter: 'agNumberColumnFilter' },
+    { field: 'unit_price', headerName: 'Unit', width: 100, filter: 'agNumberColumnFilter', valueFormatter: usd },
+    { field: 'line_total', headerName: 'Line total', width: 112, filter: 'agNumberColumnFilter', valueFormatter: usd, cellStyle: { fontWeight: 600 } },
+    { field: 'source', headerName: 'Source', width: 142, filter: true, valueFormatter: p => p.value === 'channel3' ? 'Channel3 live' : 'Local fallback', cellRenderer: TagCell },
+    { field: 'stock', headerName: 'Stock', width: 84, filter: 'agNumberColumnFilter' },
+    { field: 'origin', headerName: 'Origin', width: 84 },
+    { field: 'hs_code', headerName: 'HS code', width: 100, filter: true },
+  ], [])
+
+  const opsRowId = useCallback(p => p.data.id, [])
+  const sourceRowId = useCallback(p => p.data.id, [])
+
+  const channel3Live = sourceRows.filter(r => r.source === 'channel3').length
+  const localFallback = sourceRows.filter(r => r.source === 'local').length
+  const suppliers = new Set(sourceRows.map(r => r.supplier).filter(Boolean)).size
+
   const paid = rows.filter(r => r.status === 'completado')
   const awaiting = rows.filter(r => r.status === 'esperando_aprobacion')
   const delegated = rows.reduce((s, r) => s + (r.budget || 0), 0)
@@ -478,6 +754,8 @@ export default function App() {
   const spent = paid.reduce((s, r) => s + (r.grand_total || 0), 0)
   const selected = rows.find(r => r.thread_id === selectedId) || null
   const totals = { delegated, committed, paid: spent, awaiting: awaiting.length, count: rows.length }
+  const avgOrder = paid.length ? spent / paid.length : 0
+  const captureRate = rows.length ? Math.round((paid.length / rows.length) * 100) : 0
 
   return (
     <AgGridProvider modules={modules}>
@@ -492,6 +770,7 @@ export default function App() {
             <a href="#features">Features</a>
             <a href="#pricing">Pricing</a>
             <a href="#console">Console</a>
+            <a href="#activity">Activity</a>
           </nav>
           <a className="btn btn-primary btn-sm" href="#console">
             Launch console <ArrowRight size={16} weight="bold" aria-hidden="true" />
@@ -707,6 +986,159 @@ export default function App() {
               </section>
             </div>
           </section>
+
+          <section className="section activity-section" id="activity">
+            <div className="section-head activity-head">
+              <div>
+                <span className="eyebrow"><ChartLineUp size={15} weight="fill" aria-hidden="true" /> Live operations</span>
+                <h2>Payments and sourcing, streamed.</h2>
+                <p>Every PayPal sandbox action from the subagents and every Channel3 lookup, refreshed in place.</p>
+              </div>
+              <span className={`live-pill ${rows.length ? '' : 'sample'}`} role="status" aria-live="polite">
+                <span className="pulse" aria-hidden="true" />
+                {rows.length ? `${opsRows.length} operations` : 'Sample'}
+              </span>
+            </div>
+
+            <div className="activity-widgets">
+              <div className="kpi glass">
+                <span className="kpi-icon"><CreditCard size={18} weight="duotone" aria-hidden="true" /></span>
+                <small>PayPal operations</small>
+                <b>{opsRows.length}</b>
+                <span className="kpi-note">subagent + webhook events</span>
+              </div>
+              <div className="kpi glass">
+                <span className="kpi-icon"><CheckCircle size={18} weight="duotone" aria-hidden="true" /></span>
+                <small>Captured</small>
+                <b>{fmt(spent)}</b>
+                <span className="kpi-note">{paid.length} completed delegation{paid.length === 1 ? '' : 's'}</span>
+              </div>
+              <div className="kpi glass">
+                <span className="kpi-icon"><GlobeHemisphereWest size={18} weight="duotone" aria-hidden="true" /></span>
+                <small>Channel3 live</small>
+                <b>{channel3Live}</b>
+                <span className="kpi-note">{localFallback} local fallback</span>
+              </div>
+              <div className="kpi glass">
+                <span className="kpi-icon"><Package size={18} weight="duotone" aria-hidden="true" /></span>
+                <small>Suppliers</small>
+                <b>{suppliers}</b>
+                <span className="kpi-note">{sourceRows.length} sourced line items</span>
+              </div>
+            </div>
+
+            <section className="analytics-block" aria-labelledby="analytics-heading">
+              <div className="analytics-head">
+                <span className="eyebrow"><ChartBar size={15} weight="fill" aria-hidden="true" /> Analytics Overview</span>
+                <h2 id="analytics-heading">Revenue and traffic at a glance.</h2>
+                <p>Captured revenue, delegation value and the channel mix behind every subagent operation.</p>
+              </div>
+
+              <div className="analytics-stats">
+                <div className="stat glass">
+                  <span className="stat-label">Captured revenue</span>
+                  <b>{fmt(spent)}</b>
+                  <span className="stat-note">{paid.length} completed delegation{paid.length === 1 ? '' : 's'}</span>
+                </div>
+                <div className="stat glass">
+                  <span className="stat-label">Avg. order value</span>
+                  <b>{fmt(avgOrder)}</b>
+                  <span className="stat-note">per captured delegation</span>
+                </div>
+                <div className="stat glass">
+                  <span className="stat-label">Capture rate</span>
+                  <b>{captureRate}%</b>
+                  <span className="stat-note">{paid.length} of {rows.length} delegations</span>
+                </div>
+                <div className="stat glass">
+                  <span className="stat-label">Active suppliers</span>
+                  <b>{suppliers}</b>
+                  <span className="stat-note">{sourceRows.length} sourced line items</span>
+                </div>
+              </div>
+
+              <div className="analytics-charts">
+                <div className="card glass analytics-card">
+                  <div className="analytics-card-head">
+                    <div>
+                      <h2><ChartLineUp size={16} weight="fill" aria-hidden="true" /> Revenue Trend</h2>
+                      <p className="muted">Committed vs captured value across recent delegations.</p>
+                    </div>
+                    <div className="chart-legend inline">
+                      <span><i className="legend-dot" style={{ background: '#2563EB' }} aria-hidden="true" />Committed</span>
+                      <span><i className="legend-dot" style={{ background: '#EA580C' }} aria-hidden="true" />Captured</span>
+                    </div>
+                  </div>
+                  <RevenueTrendChart rows={rows} />
+                </div>
+                <div className="card glass analytics-card">
+                  <div className="analytics-card-head">
+                    <div>
+                      <h2><GlobeHemisphereWest size={16} weight="fill" aria-hidden="true" /> Traffic Sources</h2>
+                      <p className="muted">Where sourcing and PayPal volume originates.</p>
+                    </div>
+                  </div>
+                  <TrafficSources sourceRows={sourceRows} opsRows={opsRows} />
+                </div>
+              </div>
+            </section>
+
+            <div className="card glass activity-card">
+              <div className="activity-card-head">
+                <div>
+                  <h2><CreditCard size={16} weight="fill" aria-hidden="true" /> PayPal sandbox operations</h2>
+                  <p className="muted">Order creation, capture and webhook notifications emitted by the payments subagent.</p>
+                </div>
+                <div className="toolbar">
+                  <input aria-label="Filter PayPal operations" placeholder="Filter operations…" value={qOps} onChange={e => setQOps(e.target.value)} />
+                  <button className="btn btn-ghost btn-sm" onClick={() => opsGrid.current?.api?.exportDataAsCsv()}>
+                    Export CSV <ArrowUpRight size={15} weight="bold" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+              <div className="grid-wrap activity-grid">
+                <AgGridReact
+                  ref={opsGrid}
+                  theme={gridTheme}
+                  rowData={opsRows}
+                  columnDefs={opsCols}
+                  defaultColDef={defaultColDef}
+                  quickFilterText={qOps}
+                  getRowId={opsRowId}
+                  pagination
+                  paginationPageSize={8}
+                />
+              </div>
+            </div>
+
+            <div className="card glass activity-card">
+              <div className="activity-card-head">
+                <div>
+                  <h2><GlobeHemisphereWest size={16} weight="fill" aria-hidden="true" /> Channel3 sourcing usage</h2>
+                  <p className="muted">Product discovery and stock returned per line item, with local fallback flagged.</p>
+                </div>
+                <div className="toolbar">
+                  <input aria-label="Filter Channel3 usage" placeholder="Filter sourcing…" value={qSource} onChange={e => setQSource(e.target.value)} />
+                  <button className="btn btn-ghost btn-sm" onClick={() => sourceGrid.current?.api?.exportDataAsCsv()}>
+                    Export CSV <ArrowUpRight size={15} weight="bold" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+              <div className="grid-wrap activity-grid">
+                <AgGridReact
+                  ref={sourceGrid}
+                  theme={gridTheme}
+                  rowData={sourceRows}
+                  columnDefs={sourceCols}
+                  defaultColDef={defaultColDef}
+                  quickFilterText={qSource}
+                  getRowId={sourceRowId}
+                  pagination
+                  paginationPageSize={8}
+                />
+              </div>
+            </div>
+          </section>
         </main>
 
         <footer className="footer">
@@ -720,6 +1152,7 @@ export default function App() {
             <a href="#features">Features</a>
             <a href="#pricing">Pricing</a>
             <a href="#console">Console</a>
+            <a href="#activity">Activity</a>
           </div>
         </footer>
       </div>
