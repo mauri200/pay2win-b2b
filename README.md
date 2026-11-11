@@ -8,6 +8,12 @@ Pay2Win B2B is an agentic procurement platform. A buyer signs a single **QR mand
 - Frontend: React + Vite + AG Grid (community) + custom SVG analytics
 - Deployment: Render blueprint (`render.yaml`)
 
+**Live app:** https://pay2win-b2b.onrender.com
+
+**Demo video:** https://youtu.be/jPZXvJbuz7U?feature=shared
+
+![Pay2Win B2B landing page with live delegation control](images/portada.png)
+
 ---
 
 ## 1. The problem companies and users have today
@@ -271,7 +277,55 @@ The dashboard polls `/api/b2b/orders` every few seconds, so agent progress and p
 
 ---
 
-## 10. Application workflow
+## 10. Frontend walkthrough — from mandate to captured payment
+
+The screenshots below follow a single delegation from the landing page to the captured PayPal payment. The dashboard is a React + Vite single page served by the FastAPI app at `/`.
+
+### 10.1 Landing and live delegation control
+![Landing page with live delegation panel](images/portada.png)
+
+The hero states the promise — procurement that runs itself inside your budget — and the live panel already shows delegated vs paid totals, the commitment trend and the subagent activity feed. It reads the same ledger the console writes to, so the marketing view and the operational view never diverge.
+
+### 10.2 Delegate a budget
+![Delegation console with the mandate form](images/delegate.png)
+
+The buyer sets the purchase objective, total budget, per-item cap, financing (Pay Later in 4 installments or pay in full) and which subagents may run. No payment credentials are entered here: the form only creates a signed mandate.
+
+### 10.3 Signed QR mandate
+![Signed QR mandate with sourced items](images/qr.png)
+
+"Generate signed QR mandate" returns an HS256 JWT wrapped in a QR code, plus a preview of the sourced items, the budget, the per-item cap and the delegated subagent scope. Scanning the QR is what hands the budget to the supervisor agent.
+
+### 10.4 Run the agent team
+![Agent team run with the subagent audit trail](images/run%20te%20agent%20team.png)
+
+"Run the agent team" executes the LangGraph pipeline: procurement → customs → logistics → compliance → treasury → payments. Every subagent appends an entry to the audit trail and the KPIs update in place: delegated, committed, paid and awaiting approval.
+
+### 10.5 PayPal order created — waiting for human approval
+![PayPal sandbox order awaiting approval](images/paypal%20sandbox.png)
+
+Treasury authorises the landed cost, then the `payments` subagent creates the PayPal order through the **PayPal Agent Toolkit**. The workflow interrupts before capture: the dashboard shows the order id, amount, breakdown, payment mode and PayPal status. **No money moves yet.**
+
+### 10.6 Buyer approves inside PayPal
+![Open PayPal sandbox approval page](images/openpaypal%20sandbox.png)
+
+"Open PayPal approval" sends the buyer to the PayPal sandbox to review and approve the order. The platform never sees the buyer's credentials; approval happens inside PayPal. Back in the dashboard, `/api/b2b/approve/{tid}` verifies the order is `APPROVED` or `COMPLETED` before resuming the graph.
+
+### 10.7 Capture confirmed
+![PayPal payment captured](images/payment%20paypal.png)
+
+After approval the backend calls `POST /v2/checkout/orders/{id}/capture` and confirms the final state with `GET /v2/checkout/orders/{id}`. The delegation moves to `completado`, the paid KPI increases and the PayPal webhook events are persisted for audit.
+
+### 10.8 Live operations and analytics
+![Live operations with revenue and traffic analytics](images/trafic.png)
+
+The Live Operations section streams every PayPal sandbox action and every Channel3 lookup. The Revenue Trend chart compares committed vs captured value and the Traffic Sources chart breaks down Channel3 live, local catalog, PayPal operations and webhook events.
+
+> **Payment guarantee for the demo:** if PayPal credentials are absent or a real order fails, the flow falls back to `simulated` mode and generates a sandbox-looking order id, so the full mandate → approval → capture narrative still runs offline.
+
+---
+
+## 11. Application workflow
 
 ```mermaid
 flowchart TD
@@ -327,7 +381,7 @@ POST /api/b2b/approve/{tid} { approved: true }
 
 ---
 
-## 11. Security and limitations
+## 12. Security and limitations
 
 - Mandates are **signed JWTs (HS256)** with an expiry and a scope of allowed subagents.
 - The buyer never shares payment credentials; approval happens inside PayPal.
@@ -338,6 +392,6 @@ POST /api/b2b/approve/{tid} { approved: true }
 
 ---
 
-## 12. License
+## 13. License
 
 See the root `LICENSE` file.
